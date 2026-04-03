@@ -1,0 +1,88 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-88e8b663322cea116e09.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.16"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "QtAVL",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "QtAVL::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-QtAVL-Debug-065cdbc24ca4d999e60a.json",
+					"name" : "QtAVL",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "QtAVL_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-QtAVL_autogen-Debug-b3db9408096a497eb09f.json",
+					"name" : "QtAVL_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "QtAVL_autogen_timestamp_deps::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-QtAVL_autogen_timestamp_deps-Debug-fe6210cb61fa4356274b.json",
+					"name" : "QtAVL_autogen_timestamp_deps",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "QtAVL_qmlimportscan::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-QtAVL_qmlimportscan-Debug-47d7e2fb788778d642c0.json",
+					"name" : "QtAVL_qmlimportscan",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "D:/GitHub/QtAVL/build",
+		"source" : "D:/GitHub/QtAVL"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 8
+	}
+}

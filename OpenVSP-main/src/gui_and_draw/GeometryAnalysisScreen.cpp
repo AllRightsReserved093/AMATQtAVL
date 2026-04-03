@@ -1,0 +1,1337 @@
+//
+// This file is released under the terms of the NASA Open Source Agreement (NOSA)
+// version 1.3 as detailed in the LICENSE file which accompanies this software.
+//
+//
+//////////////////////////////////////////////////////////////////////
+
+#include "GeometryAnalysisScreen.h"
+#include "GeometryAnalysisMgr.h"
+#include "ScreenMgr.h"
+#include "ResultsViewer.h"
+#include "ParmMgr.h"
+#include <FL/fl_ask.H>
+#include "AuxiliaryGeom.h"
+
+#include "ModeMgr.h"
+#include "StlHelper.h"
+#include "SubSurfaceMgr.h"
+#include "HingeGeom.h"
+
+//==== Constructor ====//
+GeometryAnalysisScreen::GeometryAnalysisScreen( ScreenMgr* mgr ) : BasicScreen( mgr, 700, 800, "Geometry Analyses", "GeometryAnalysis.html" )
+{
+    m_GenLayout.SetGroupAndScreen( m_FLTK_Window, this );
+
+    m_GenLayout.ForceNewLine();
+    m_GenLayout.AddY(7);
+    m_GenLayout.AddX(5);
+
+    m_GenLayout.AddSubGroupLayout( m_BorderLayout, m_GenLayout.GetRemainX() - 5.0,
+                                   m_GenLayout.GetRemainY() - 5.0);
+
+
+    // Pointer for the widths of each column in the browser to support resizing
+    // Last column width must be 0
+    static int out_col_widths[] = { 200, 100, 100, 100, 0 }; // widths for each column
+
+    m_GeometryAnalysisBrowser = m_BorderLayout.AddColResizeBrowser( out_col_widths, 4, 200 );
+    m_GeometryAnalysisBrowser->Init( this, m_BorderLayout.GetGroup() );
+
+
+    m_BorderLayout.SetButtonWidth( m_BorderLayout.GetW() / 2 );
+
+    m_BorderLayout.SetSameLineFlag( true );
+    m_BorderLayout.SetFitWidthFlag( false );
+
+    m_BorderLayout.AddButton( m_AddGeometryAnalysis, "Add" );
+    m_BorderLayout.AddButton( m_DelGeometryAnalysis, "Del" );
+    m_BorderLayout.ForceNewLine();
+
+    m_BorderLayout.AddButton( m_EvaluateAllGeometryAnalyses, "Evaluate All" );
+    m_BorderLayout.AddButton( m_DelAllGeometryAnalyses, "Del All" );
+    m_BorderLayout.ForceNewLine();
+
+    m_BorderLayout.AddButton( m_ShowBoth, "Show" );
+    m_BorderLayout.AddButton( m_ShowOnlyBoth, "Show Only" );
+    m_BorderLayout.ForceNewLine();
+
+    m_BorderLayout.SetSameLineFlag( false );
+    m_BorderLayout.SetFitWidthFlag( true );
+
+
+    m_BorderLayout.AddSubGroupLayout( m_GCaseLayout, m_BorderLayout.GetW(), m_BorderLayout.GetRemainY() );
+
+    m_GCaseLayout.AddYGap();
+    m_GCaseLayout.AddDividerBox( "Geometry Analysis" );
+
+    m_GCaseLayout.SetSameLineFlag( true );
+    m_GCaseLayout.AddInput( m_GANameInput, "Name", m_GCaseLayout.GetW() * 0.5 + 5 );
+
+    m_GCaseLayout.AddX( 5 );
+
+    m_GCaseLayout.AddChoice( m_GeometryAnalysisTypeChoice, "Type", m_GCaseLayout.GetW() * 0.5 );
+    m_GeometryAnalysisTypeChoice.AddItem( "External", vsp::EXTERNAL_INTERFERENCE );
+    m_GeometryAnalysisTypeChoice.AddItem( "Packaging", vsp::PACKAGING_INTERFERENCE );
+    m_GeometryAnalysisTypeChoice.AddItem( "Self External", vsp::EXTERNAL_SELF_INTERFERENCE );
+    m_GeometryAnalysisTypeChoice.AddItem( "Plane Distance", vsp::PLANE_STATIC_DISTANCE_INTERFERENCE );
+    m_GeometryAnalysisTypeChoice.AddItem( "Plane 2pt Angle", vsp::PLANE_2PT_ANGLE_INTERFERENCE );
+    m_GeometryAnalysisTypeChoice.AddItem( "Tipback", vsp::GEAR_CG_TIPBACK_ANALYSIS );
+    m_GeometryAnalysisTypeChoice.AddItem( "Plane 1pt Angle", vsp::PLANE_1PT_ANGLE_INTERFERENCE );
+    m_GeometryAnalysisTypeChoice.AddItem( "Weight Distribution", vsp::GEAR_WEIGHT_DISTRIBUTION_ANALYSIS );
+    m_GeometryAnalysisTypeChoice.AddItem( "Tipover", vsp::GEAR_TIPOVER_ANALYSIS );
+    m_GeometryAnalysisTypeChoice.AddItem( "Ground Maneuverability", vsp::GEAR_TURN_ANALYSIS );
+    m_GeometryAnalysisTypeChoice.AddItem( "From Point Visibility", vsp::VISIBLE_FROM_POINT_ANALYSIS );
+    m_GeometryAnalysisTypeChoice.AddItem( "Composite Clearance Envelope", vsp::CCE_INTERFERENCE );
+    m_GeometryAnalysisTypeChoice.AddItem( "Swept Volume", vsp::LINEAR_SWEPT_VOLUME_ANALYSIS );
+    m_GeometryAnalysisTypeChoice.AddItem( "Look At Visibility", vsp::VISIBLE_AT_SURF_ANALYSIS );
+    m_GeometryAnalysisTypeChoice.UpdateItems();
+
+    m_GCaseLayout.ForceNewLine();
+    m_GCaseLayout.SetSameLineFlag( false );
+
+    m_GCaseLayout.AddYGap();
+
+    int geomH = 7 * m_GCaseLayout.GetStdHeight() + m_GCaseLayout.GetDividerHeight();
+    int geomW = ( m_GCaseLayout.GetW() - 5 ) * 0.5;
+    m_GCaseLayout.AddSubGroupLayout( m_PrimaryLayout, geomW, geomH );
+    m_GCaseLayout.AddX( geomW + 5 );
+    m_GCaseLayout.AddSubGroupLayout( m_SecondaryLayout, geomW, geomH );
+    m_GCaseLayout.AddY( geomH );
+
+    m_GCaseLayout.ForceNewLine( 0 );
+    m_GCaseLayout.AddYGap();
+
+    int optH = 10 * m_GCaseLayout.GetStdHeight() + m_GCaseLayout.GetDividerHeight();
+    m_GCaseLayout.AddSubGroupLayout( m_OptionsLayout, m_GCaseLayout.GetW(), optH );
+    m_GCaseLayout.AddY( optH );
+
+    m_GCaseLayout.ForceNewLine( 0 );
+    m_GCaseLayout.AddYGap();
+
+    m_OptionsLayout.AddDividerBox( "Options" );
+
+    m_OptionsLayout.AddSubGroupLayout( m_RotateOptionsLayout, m_OptionsLayout.GetW(), m_OptionsLayout.GetRemainY() );
+    m_OptionsLayout.AddSubGroupLayout( m_VisibilityOptionsLayout, m_OptionsLayout.GetW(), m_OptionsLayout.GetRemainY() );
+    m_OptionsLayout.AddSubGroupLayout( m_MotionOptionsLayout, m_OptionsLayout.GetW(), m_OptionsLayout.GetRemainY() );
+    m_OptionsLayout.AddSubGroupLayout( m_LookAtVisibilityOptionsLayout, m_OptionsLayout.GetW(), m_OptionsLayout.GetRemainY() );
+
+    m_PrimaryLayout.AddDividerBox( "Primary" );
+
+    m_PrimaryLayout.SetSameLineFlag( true );
+    m_PrimaryLayout.SetFitWidthFlag( false );
+
+    int bw = m_PrimaryLayout.GetChoiceButtonWidth();
+    m_PrimaryLayout.SetButtonWidth( bw );
+
+    m_PrimaryLayout.SetSameLineFlag( true );
+    m_PrimaryLayout.SetChoiceButtonWidth( 0 );
+    m_PrimaryLayout.SetFitWidthFlag( false );
+    m_PrimaryLayout.AddButton( m_PrimarySetToggle, "Set:" );
+    m_PrimaryLayout.SetFitWidthFlag( true );
+    m_PrimaryLayout.AddChoice(m_PrimarySetChoice, "", bw);
+    m_PrimaryLayout.ForceNewLine();
+
+    m_PrimaryLayout.SetSameLineFlag( true );
+    m_PrimaryLayout.SetChoiceButtonWidth( 0 );
+    m_PrimaryLayout.SetFitWidthFlag( false );
+    m_PrimaryLayout.AddButton( m_PrimaryModeToggle, "Mode:" );
+    m_PrimaryLayout.SetFitWidthFlag( true );
+    m_PrimaryLayout.AddChoice(m_PrimaryModeChoice, "", bw );
+    m_PrimaryLayout.ForceNewLine();
+
+    m_PrimaryLayout.SetSameLineFlag( true );
+    m_PrimaryLayout.SetChoiceButtonWidth( 0 );
+    m_PrimaryLayout.SetFitWidthFlag( false );
+    m_PrimaryLayout.AddButton( m_PrimaryGeomToggle, "Geom:" );
+    m_PrimaryLayout.SetFitWidthFlag( true );
+    m_PrimaryGeomPicker.AddExcludeType( PT_CLOUD_GEOM_TYPE );
+    m_PrimaryGeomPicker.AddExcludeType( BLANK_GEOM_TYPE );
+    m_PrimaryGeomPicker.AddExcludeType( HINGE_GEOM_TYPE );
+    m_PrimaryLayout.AddGeomPicker( m_PrimaryGeomPicker, m_PrimaryLayout.GetButtonWidth(), "" );
+    m_PrimaryLayout.ForceNewLine();
+
+    m_PrimaryToggleGroup.Init( this );
+    m_PrimaryToggleGroup.AddButton( m_PrimarySetToggle.GetFlButton() ); // Order matters.
+    m_PrimaryToggleGroup.AddButton( m_PrimaryGeomToggle.GetFlButton() );
+    m_PrimaryToggleGroup.AddButton( m_PrimaryModeToggle.GetFlButton() );
+
+
+    m_SecondaryLayout.AddDividerBox( "Secondary" );
+
+    m_SecondaryLayout.SetSameLineFlag( true );
+    m_SecondaryLayout.SetFitWidthFlag( false );
+
+    m_SecondaryLayout.SetButtonWidth( bw );
+
+    m_SecondaryLayout.SetSameLineFlag( true );
+    m_SecondaryLayout.SetChoiceButtonWidth( 0 );
+    m_SecondaryLayout.SetFitWidthFlag( false );
+    m_SecondaryLayout.AddButton( m_SecondarySetToggle, "Set:" );
+    m_SecondaryLayout.SetFitWidthFlag( true );
+    m_SecondaryLayout.AddChoice(m_SecondarySetChoice, "", bw);
+    m_SecondaryLayout.ForceNewLine();
+
+    m_SecondaryLayout.SetSameLineFlag( true );
+    m_SecondaryLayout.SetChoiceButtonWidth( 0 );
+    m_SecondaryLayout.SetFitWidthFlag( false );
+    m_SecondaryLayout.AddButton( m_SecondaryGeomToggle, "Geom:" );
+    m_SecondaryLayout.SetFitWidthFlag( true );
+    m_SecondaryGeomPicker.AddExcludeType( PT_CLOUD_GEOM_TYPE );
+    m_SecondaryLayout.AddGeomPicker( m_SecondaryGeomPicker, m_SecondaryLayout.GetButtonWidth(), "" );
+
+    m_SecondaryLayout.ForceNewLine();
+
+    m_SecondaryLayout.SetSameLineFlag( true );
+    m_SecondaryLayout.SetFitWidthFlag( false );
+
+    m_SecondaryLayout.AddButton( m_SecondaryUseZGroundToggle, "Z Plane" );
+    m_SecondaryLayout.SetFitWidthFlag( true );
+    m_SecondaryLayout.SetButtonWidth( 0 );
+    m_SecondaryLayout.AddSlider( m_SecondaryZGroundSlider, "", 10, "%6.4f" );
+    m_SecondaryZGroundSlider.SetButtonNameUpdate( false );
+    m_SecondaryLayout.ForceNewLine();
+    m_SecondaryLayout.SetButtonWidth( bw );
+
+    m_SecondaryLayout.SetSameLineFlag( false );
+    m_SecondaryLayout.SetFitWidthFlag( true );
+
+    m_SecondaryLayout.AddButton( m_SecondaryUsePointToggle, "Point" );
+
+    m_SecondaryLayout.AddSlider( m_SecondaryXSlider, "X", 10, "%6.4f" );
+    m_SecondaryLayout.AddSlider( m_SecondaryYSlider, "Y", 10, "%6.4f" );
+    m_SecondaryLayout.AddSlider( m_SecondaryZSlider, "Z", 10, "%6.4f" );
+
+    m_SecondaryToggleGroup.Init( this );
+    m_SecondaryToggleGroup.AddButton( m_SecondarySetToggle.GetFlButton() );
+    m_SecondaryToggleGroup.AddButton( m_SecondaryGeomToggle.GetFlButton() );
+    m_SecondaryToggleGroup.AddButton( m_SecondaryUseZGroundToggle.GetFlButton() );
+    m_SecondaryToggleGroup.AddButton( m_SecondaryUsePointToggle.GetFlButton() );
+
+    vector< int > val_map;
+    val_map.push_back( vsp::SET_TARGET );
+    val_map.push_back( vsp::GEOM_TARGET );
+    val_map.push_back( vsp::Z_TARGET );
+    val_map.push_back( vsp::XYZ_TARGET );
+    m_SecondaryToggleGroup.SetValMapVec( val_map );
+
+
+    m_RotateOptionsLayout.SetButtonWidth( m_RotateOptionsLayout.GetW() * 0.5 );
+    m_RotateOptionsLayout.AddButton( m_CCWToggle, "CCW" );
+    m_RotateOptionsLayout.AddButton( m_CWToggle, "CW" );
+    m_RotateOptionsLayout.ForceNewLine();
+
+    m_CCWToggleGroup.Init( this );
+    m_CCWToggleGroup.AddButton( m_CCWToggle.GetFlButton() );
+    m_CCWToggleGroup.AddButton( m_CWToggle.GetFlButton() );
+
+
+    m_VisibilityOptionsLayout.SetSameLineFlag( true );
+    m_VisibilityOptionsLayout.SetFitWidthFlag( false );
+
+
+    m_VisibilityOptionsLayout.SetButtonWidth( m_VisibilityOptionsLayout.GetW() * 0.5 );
+
+    m_VisibilityOptionsLayout.AddButton( m_VizContinuousToggle, "Continuous" );
+    m_VisibilityOptionsLayout.AddButton( m_VizDiscreteToggle, "Discrete" );
+    m_VisibilityOptionsLayout.ForceNewLine();
+
+    m_VizModeToggleGroup.Init( this );
+    m_VizModeToggleGroup.AddButton( m_VizContinuousToggle.GetFlButton() ); // false first
+    m_VizModeToggleGroup.AddButton( m_VizDiscreteToggle.GetFlButton() );  // true
+
+    m_VisibilityOptionsLayout.AddButton( m_PolyVisibleToggle, "Visible" );
+    m_VisibilityOptionsLayout.AddButton( m_PolyOccludedToggle, "Occluded" );
+    m_VisibilityOptionsLayout.ForceNewLine();
+
+    m_PolyVisibleToggleGroup.Init( this );
+    m_PolyVisibleToggleGroup.AddButton( m_PolyOccludedToggle.GetFlButton() ); // false first
+    m_PolyVisibleToggleGroup.AddButton( m_PolyVisibleToggle.GetFlButton() );  // true
+
+    m_VisibilityOptionsLayout.AddYGap();
+
+    m_VisibilityOptionsLayout.SetSameLineFlag( true );
+    m_VisibilityOptionsLayout.SetFitWidthFlag( false );
+
+    int thirdw = ( m_VisibilityOptionsLayout.GetW() - 5 ) / 3;
+
+    m_VisibilityOptionsLayout.AddSubGroupLayout( m_CutoutLayout, thirdw, m_VisibilityOptionsLayout.GetRemainY() );
+    m_VisibilityOptionsLayout.AddX( thirdw + 5 );
+    m_VisibilityOptionsLayout.AddSubGroupLayout( m_AzElLayout, 2 * thirdw, m_VisibilityOptionsLayout.GetRemainY() );
+
+
+    m_CutoutLayout.AddDividerBox( "Cutout" );
+
+    m_CutoutLayout.SetButtonWidth( thirdw );
+    m_SubSurfCutoutBrowser = m_CutoutLayout.AddCheckBrowser( m_CutoutLayout.GetRemainY() );
+    m_SubSurfCutoutBrowser->callback( staticScreenCB, this );
+
+
+
+
+    m_AzElLayout.AddDividerBox( "Discrete Az/El View Directions" );
+
+    m_AzElScroll = m_AzElLayout.AddFlScroll( m_AzElLayout.GetRemainY() - m_AzElLayout.GetStdHeight() );
+    m_AzElScroll->type( Fl_Scroll::VERTICAL_ALWAYS );
+    m_AzElScroll->box( FL_BORDER_BOX );
+    m_AzElScrollLayout.SetGroupAndScreen( m_AzElScroll, this );
+
+    m_AzElLayout.SetSameLineFlag( true );
+    m_AzElLayout.SetFitWidthFlag( false );
+
+    m_AzElLayout.SetButtonWidth( m_AzElLayout.GetW() / 4 );
+    m_AzElLayout.AddButton( m_AddAzElButton, "Add" );
+    m_AzElLayout.AddButton( m_LookAlongAzElButton, "Look Along" );
+    m_AzElLayout.AddButton( m_DelAzElButton, "Del" );
+    m_AzElLayout.AddButton( m_DelAllAzElButton, "Del All" );
+
+
+    m_MotionOptionsLayout.SetSameLineFlag( false );
+    m_MotionOptionsLayout.SetFitWidthFlag( true );
+
+
+    m_MotionOptionsLayout.AddYGap();
+    m_MotionOptionsLayout.AddDividerBox( "Motion" );
+
+    m_MotionOptionsLayout.AddChoice( m_ExtentChoice, "Extent" );
+
+    m_MotionOptionsLayout.AddSlider( m_DispXSlider, "X", 10, "%6.4f" );
+    m_MotionOptionsLayout.AddSlider( m_DispYSlider, "Y", 10, "%6.4f" );
+    m_MotionOptionsLayout.AddSlider( m_DispZSlider, "Z", 10, "%6.4f" );
+
+    m_MotionOptionsLayout.AddYGap();
+    m_MotionOptionsLayout.AddDividerBox( "Dispersion" );
+
+    m_MotionOptionsLayout.SetSameLineFlag( true );
+    m_MotionOptionsLayout.SetFitWidthFlag( false );
+
+    m_MotionOptionsLayout.SetInputWidth( 50 );
+
+    char theta[16];
+    int indx = 0;
+    indx += fl_utf8encode( 952, &theta[ indx ] ); // Greek character theta
+    theta[ indx ] = 'X';
+    theta[ indx + 1 ] = '+';
+    theta[ indx + 2 ] = 0;
+
+    int tbw = 55;
+    int thetabw = 30;
+
+    m_MotionOptionsLayout.SetButtonWidth( tbw );
+    m_MotionOptionsLayout.AddButton( m_SymmRotXToggle, "Symm" );
+    m_MotionOptionsLayout.SetFitWidthFlag( true );
+    m_MotionOptionsLayout.SetButtonWidth( thetabw );
+    m_MotionOptionsLayout.AddSlider( m_RotXpSlider, theta, 10, "%6.4f", m_MotionOptionsLayout.GetRemainX() * 0.5 );
+    theta[ indx + 1 ] = '-';
+    m_MotionOptionsLayout.AddSlider( m_RotXnSlider, theta, 10, "%6.4f" );
+
+    theta[ indx ] = 'Y';
+    theta[ indx + 1 ] = '+';
+    m_MotionOptionsLayout.ForceNewLine();
+    m_MotionOptionsLayout.SetFitWidthFlag( false );
+    m_MotionOptionsLayout.SetButtonWidth( tbw );
+    m_MotionOptionsLayout.SetButtonWidth( tbw );
+    m_MotionOptionsLayout.AddButton( m_SymmRotYToggle, "Symm" );
+    m_MotionOptionsLayout.SetFitWidthFlag( true );
+    m_MotionOptionsLayout.SetButtonWidth( thetabw );
+    m_MotionOptionsLayout.AddSlider( m_RotYpSlider, theta, 10, "%6.4f", m_MotionOptionsLayout.GetRemainX() * 0.5 );
+    theta[ indx + 1 ] = '-';
+    m_MotionOptionsLayout.AddSlider( m_RotYnSlider, theta, 10, "%6.4f" );
+
+    theta[ indx ] = 'Z';
+    theta[ indx + 1 ] = '+';
+    m_MotionOptionsLayout.ForceNewLine();
+    m_MotionOptionsLayout.SetFitWidthFlag( false );
+    m_MotionOptionsLayout.SetButtonWidth( tbw );
+    m_MotionOptionsLayout.SetButtonWidth( tbw );
+    m_MotionOptionsLayout.AddButton( m_SymmRotZToggle, "Symm" );
+    m_MotionOptionsLayout.SetFitWidthFlag( true );
+    m_MotionOptionsLayout.SetButtonWidth( thetabw );
+    m_MotionOptionsLayout.AddSlider( m_RotZpSlider, theta, 10, "%6.4f", m_MotionOptionsLayout.GetRemainX() * 0.5 );
+    theta[ indx + 1 ] = '-';
+    m_MotionOptionsLayout.AddSlider( m_RotZnSlider, theta, 10, "%6.4f" );
+
+    m_LookAtVisibilityOptionsLayout.AddSlider( m_AzimuthSlider, "Azimuth", 10, "%6.4f" );
+    m_LookAtVisibilityOptionsLayout.AddSlider( m_ElevationSlider, "Elevation", 10, "%6.4f" );
+    m_LookAtVisibilityOptionsLayout.AddSlider( m_N2RefractionIndexSlider, "N2", 1, "%6.4f" );
+
+    m_LookAtVisibilityOptionsLayout.AddButton( m_LookAlongButton, "Look From" );
+
+    m_GCaseLayout.AddYGap();
+    m_GCaseLayout.AddDividerBox( "Analysis" );
+
+    m_GCaseLayout.SetSameLineFlag( true );
+    m_GCaseLayout.SetFitWidthFlag( false );
+
+    m_GCaseLayout.SetButtonWidth( (( m_GCaseLayout.GetW() - 5 ) * 0.5 - 5) * 0.5 );
+
+    m_GCaseLayout.AddButton( m_Evaluate, "Evaluate" );
+    m_GCaseLayout.AddX( 5 );
+    m_GCaseLayout.AddButton( m_ApplyRotation, "Apply Rotation" );
+    m_GCaseLayout.AddX( 5 );
+    m_GCaseLayout.AddButton( m_ShowResultsViewer, "Show Results" );
+    m_GCaseLayout.SetFitWidthFlag( true );
+    m_GCaseLayout.SetButtonWidth( 0 );
+    m_GCaseLayout.AddOutput( m_ResultOutput, "", "%6.5f", m_GCaseLayout.GetW() - m_GCaseLayout.GetRemainX() );
+
+    m_GeometryBrowserSelect = -1;
+
+    m_CurrentAzElScrollIndex = -1;
+
+    // Initialize to valid group
+    m_OptionsCurrDisplayGroup = &m_RotateOptionsLayout;
+    // Set to null to hide them all.
+    OptionsDisplayGroup( nullptr );
+}
+
+GeometryAnalysisScreen::~GeometryAnalysisScreen()
+{
+}
+
+//==== Update Screen ====//
+bool GeometryAnalysisScreen::Update()
+{
+    BasicScreen::Update();
+
+    Vehicle *veh = VehicleMgr.GetVehicle();
+    if ( !veh )
+    {
+        return false;
+    }
+
+    GeometryAnalysisMgr.Update();
+
+    UpdateGeometryAnalysisBrowser();
+
+    UpdateAzElScrollGroup();
+
+    GeometryAnalysisCase* gcase = GeometryAnalysisMgr.GetGeometryAnalysis( m_GeometryBrowserSelect );
+
+    if ( gcase )
+    {
+        UpdateWindowSubSurfBrowser();
+
+        m_GCaseLayout.GetGroup()->activate();
+
+
+        m_GANameInput.Update( gcase->GetName() );
+
+        m_GeometryAnalysisTypeChoice.Update( gcase->m_GeometryAnalysisType.GetID() );
+
+        m_ResultOutput.Update( gcase->m_LastResultValue.GetID() );
+
+        m_PrimaryToggleGroup.Update( gcase->m_PrimaryType.GetID() );
+        m_SecondaryToggleGroup.Update( gcase->m_SecondaryType.GetID() );
+
+        m_SecondaryZGroundSlider.Update( gcase->m_SecondaryZGround.GetID() );
+
+        m_CCWToggleGroup.Update( gcase->m_SecondaryCCWFlag.GetID() );
+
+        m_PolyVisibleToggleGroup.Update( gcase->m_PolyVisibleFlag.GetID() );
+
+        m_VizModeToggleGroup.Update( gcase->m_DiscreteVisibilityFlag.GetID() );
+
+        m_SecondaryXSlider.Update( gcase->m_SecondaryX.GetID() );
+        m_SecondaryYSlider.Update( gcase->m_SecondaryY.GetID() );
+        m_SecondaryZSlider.Update( gcase->m_SecondaryZ.GetID() );
+
+        m_ExtentChoice.ClearItems();
+
+        m_ExtentChoice.AddItem( "Forward Direction", vsp::EXTENT_FORWARD_INF );
+        m_ExtentChoice.AddItem( "Reverse Direction", vsp::EXTENT_REVERSE_INF );
+
+        bool transhinge = false;
+        if ( gcase->m_GeometryAnalysisType() == vsp::LINEAR_SWEPT_VOLUME_ANALYSIS )
+        {
+            if ( gcase->m_SecondaryType() == vsp::GEOM_TARGET )
+            {
+                Geom* geom = veh->FindGeom( gcase->m_SecondaryGeomID );
+
+                if ( geom )
+                {
+                    HingeGeom* hinge_ptr = dynamic_cast< HingeGeom* >( geom );
+
+                    if ( hinge_ptr )
+                    {
+                        transhinge = true;
+                        if ( hinge_ptr->m_JointTranslateFlag() )
+                        {
+
+                            if ( hinge_ptr->m_JointTransMinFlag() &&
+                                 hinge_ptr->m_JointTransMaxFlag() )
+                            {
+                                m_ExtentChoice.AddItem( "Full Range", vsp::EXTENT_SLIDER_FULL );
+                            }
+
+                            if ( hinge_ptr->m_JointTransMinFlag() )
+                            {
+                                m_ExtentChoice.AddItem( "Before", vsp::EXTENT_SLIDER_BEFORE );
+                            }
+
+                            if ( hinge_ptr->m_JointTransMaxFlag() )
+                            {
+                                m_ExtentChoice.AddItem( "After", vsp::EXTENT_SLIDER_AFTER );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if ( !transhinge )
+        {
+            m_ExtentChoice.AddItem( "Forward Displacement", vsp::EXTENT_FORWARD_FINITE );
+            m_ExtentChoice.AddItem( "Reverse Displacement", vsp::EXTENT_REVERSE_FINITE );
+        }
+
+
+        m_ExtentChoice.UpdateItems();
+
+        m_ExtentChoice.Update( gcase->m_ExtentType.GetID() );
+
+        m_DispXSlider.Update( gcase->m_DispX.GetID() );
+        m_DispYSlider.Update( gcase->m_DispY.GetID() );
+        m_DispZSlider.Update( gcase->m_DispZ.GetID() );
+
+        m_SymmRotXToggle.Update( gcase->m_SymmRotX.GetID() );
+        m_SymmRotYToggle.Update( gcase->m_SymmRotY.GetID() );
+        m_SymmRotZToggle.Update( gcase->m_SymmRotZ.GetID() );
+
+        m_RotXpSlider.Update( gcase->m_RotXp.GetID() );
+        m_RotYpSlider.Update( gcase->m_RotYp.GetID() );
+        m_RotZpSlider.Update( gcase->m_RotZp.GetID() );
+
+        m_RotXnSlider.Update( gcase->m_RotXn.GetID() );
+        m_RotYnSlider.Update( gcase->m_RotYn.GetID() );
+        m_RotZnSlider.Update( gcase->m_RotZn.GetID() );
+
+        m_AzimuthSlider.Update( gcase->m_Azimuth.GetID() );
+        m_ElevationSlider.Update( gcase->m_Elevation.GetID() );
+        m_N2RefractionIndexSlider.Update( gcase->m_N2RefractionIndex.GetID() );
+
+        m_ScreenMgr->LoadSetChoice( {&m_PrimarySetChoice, &m_SecondarySetChoice}, {gcase->m_PrimarySet.GetID(), gcase->m_SecondarySet.GetID()} );
+
+        m_ScreenMgr->LoadModeChoice( m_PrimaryModeChoice, m_ModeIDs, gcase->m_PrimaryModeID );
+
+        // Handle single geom that require special types.
+        m_PrimaryGeomPicker.ClearIncludeType();
+        if ( gcase->m_GeometryAnalysisType() == vsp::GEAR_CG_TIPBACK_ANALYSIS ||
+             gcase->m_GeometryAnalysisType() == vsp::GEAR_WEIGHT_DISTRIBUTION_ANALYSIS ||
+             gcase->m_GeometryAnalysisType() == vsp::GEAR_TIPOVER_ANALYSIS )
+        {
+            m_PrimaryGeomPicker.AddIncludeType( AUXILIARY_GEOM_TYPE );
+        }
+        m_PrimaryGeomPicker.Update();
+
+        if ( m_PrimaryGeomPicker.ValidGeom( gcase->m_PrimaryGeomID ) )
+        {
+            m_PrimaryGeomPicker.SetGeomChoice( gcase->m_PrimaryGeomID );
+        }
+        else
+        {
+            gcase->m_PrimaryGeomID = m_PrimaryGeomPicker.GetSetValidGeom();
+        }
+
+        // Handle dual geom that require special types.
+        m_SecondaryGeomPicker.ClearIncludeType();
+        if ( gcase->m_GeometryAnalysisType() == vsp::PLANE_2PT_ANGLE_INTERFERENCE ||
+             gcase->m_GeometryAnalysisType() == vsp::PLANE_1PT_ANGLE_INTERFERENCE ||
+             gcase->m_GeometryAnalysisType() == vsp::GEAR_TURN_ANALYSIS ||
+             gcase->m_GeometryAnalysisType() == vsp::CCE_INTERFERENCE )
+        {
+            m_SecondaryGeomPicker.AddIncludeType( AUXILIARY_GEOM_TYPE );
+        }
+
+        if ( gcase->m_GeometryAnalysisType() == vsp::PLANE_STATIC_DISTANCE_INTERFERENCE )
+        {
+            m_SecondaryGeomPicker.AddIncludeType( AUXILIARY_GEOM_TYPE );
+            m_SecondaryGeomPicker.AddIncludeType( GEAR_GEOM_TYPE );
+        }
+        m_SecondaryGeomPicker.Update();
+
+        if ( m_SecondaryGeomPicker.ValidGeom( gcase->m_SecondaryGeomID ) )
+        {
+            m_SecondaryGeomPicker.SetGeomChoice( gcase->m_SecondaryGeomID );
+        }
+        else
+        {
+            gcase->m_SecondaryGeomID = m_SecondaryGeomPicker.GetSetValidGeom();
+        }
+
+
+        if ( ModeMgr.GetNumModes() == 0 )
+        {
+            if ( gcase->m_PrimaryType() == vsp::MODE_TARGET )
+            {
+                gcase->m_PrimaryType = vsp::SET_TARGET;
+                m_ScreenMgr->SetUpdateFlag( true );
+            }
+            m_PrimaryModeToggle.Deactivate();
+        }
+        else
+        {
+            m_PrimaryModeToggle.Activate();
+        }
+
+        if ( gcase->m_PrimaryType() == vsp::MODE_TARGET )
+        {
+            m_PrimaryModeChoice.Activate();
+            m_PrimarySetChoice.Deactivate();
+            m_PrimaryGeomPicker.Deactivate();
+
+            Mode *m = ModeMgr.GetMode( gcase->m_PrimaryModeID );
+            if ( m )
+            {
+                if ( gcase->m_PrimarySet() != m->m_NormalSet() )
+                {
+                    gcase->m_PrimarySet = m->m_NormalSet();
+                    m_ScreenMgr->SetUpdateFlag( true );
+                }
+            }
+        }
+        else if ( gcase->m_PrimaryType() == vsp::SET_TARGET )
+        {
+            m_PrimaryModeChoice.Deactivate();
+            m_PrimarySetChoice.Activate();
+            m_PrimaryGeomPicker.Deactivate();
+
+        }
+        else if ( gcase->m_PrimaryType() == vsp::GEOM_TARGET )
+        {
+            m_PrimaryModeChoice.Deactivate();
+            m_PrimarySetChoice.Deactivate();
+            m_PrimaryGeomPicker.Activate();
+        }
+
+        if ( gcase->m_GeometryAnalysisType() == vsp::PLANE_STATIC_DISTANCE_INTERFERENCE )
+        {
+            m_SecondaryUseZGroundToggle.Activate();
+        }
+        else
+        {
+            m_SecondaryUseZGroundToggle.Deactivate();
+        }
+
+        if ( gcase->m_GeometryAnalysisType() == vsp::VISIBLE_FROM_POINT_ANALYSIS )
+        {
+            m_SecondaryUsePointToggle.Activate();
+        }
+        else
+        {
+            m_SecondaryUsePointToggle.Deactivate();
+
+            m_SecondaryXSlider.Deactivate();
+            m_SecondaryYSlider.Deactivate();
+            m_SecondaryZSlider.Deactivate();
+        }
+
+        if ( gcase->m_SecondaryType() == vsp::SET_TARGET )
+        {
+            m_SecondarySetChoice.Activate();
+            m_SecondaryGeomPicker.Deactivate();
+            m_SecondaryZGroundSlider.Deactivate();
+
+            m_SecondaryXSlider.Deactivate();
+            m_SecondaryYSlider.Deactivate();
+            m_SecondaryZSlider.Deactivate();
+        }
+        else if ( gcase->m_SecondaryType() == vsp::GEOM_TARGET )
+        {
+            m_SecondarySetChoice.Deactivate();
+            m_SecondaryGeomPicker.Activate();
+            m_SecondaryZGroundSlider.Deactivate();
+
+            m_SecondaryXSlider.Deactivate();
+            m_SecondaryYSlider.Deactivate();
+            m_SecondaryZSlider.Deactivate();
+        }
+        else if ( gcase->m_SecondaryType() == vsp::Z_TARGET )
+        {
+            m_SecondarySetChoice.Deactivate();
+            m_SecondaryGeomPicker.Deactivate();
+            m_SecondaryZGroundSlider.Activate();
+
+            m_SecondaryXSlider.Deactivate();
+            m_SecondaryYSlider.Deactivate();
+            m_SecondaryZSlider.Deactivate();
+        }
+        else if ( gcase->m_SecondaryType() == vsp::XYZ_TARGET )
+        {
+            m_SecondarySetChoice.Deactivate();
+            m_SecondaryGeomPicker.Deactivate();
+            m_SecondaryZGroundSlider.Deactivate();
+
+            m_SecondaryXSlider.Activate();
+            m_SecondaryYSlider.Activate();
+            m_SecondaryZSlider.Activate();
+        }
+
+        // Single-geometry cases.
+        if ( gcase->m_GeometryAnalysisType() == vsp::EXTERNAL_SELF_INTERFERENCE ||
+             gcase->m_GeometryAnalysisType() == vsp::GEAR_CG_TIPBACK_ANALYSIS ||
+             gcase->m_GeometryAnalysisType() == vsp::GEAR_WEIGHT_DISTRIBUTION_ANALYSIS ||
+             gcase->m_GeometryAnalysisType() == vsp::GEAR_TIPOVER_ANALYSIS ||
+             gcase->m_GeometryAnalysisType() == vsp::VISIBLE_AT_SURF_ANALYSIS )
+        {
+            m_SecondaryLayout.GetGroup()->deactivate();
+        }
+        else // Dual-geometry cases
+        {
+            m_SecondaryLayout.GetGroup()->activate();
+        }
+
+        if ( gcase->m_GeometryAnalysisType() == vsp::PLANE_STATIC_DISTANCE_INTERFERENCE ||
+             gcase->m_GeometryAnalysisType() == vsp::PLANE_2PT_ANGLE_INTERFERENCE ||
+             gcase->m_GeometryAnalysisType() == vsp::PLANE_1PT_ANGLE_INTERFERENCE ||
+             gcase->m_GeometryAnalysisType() == vsp::GEAR_TURN_ANALYSIS ||
+             gcase->m_GeometryAnalysisType() == vsp::CCE_INTERFERENCE )
+        {
+            m_SecondarySetToggle.Deactivate();
+            m_SecondarySetChoice.Deactivate();
+        }
+
+        if ( gcase->m_GeometryAnalysisType() == vsp::LINEAR_SWEPT_VOLUME_ANALYSIS )
+        {
+            m_DispXSlider.Activate();
+            m_DispYSlider.Activate();
+            m_DispZSlider.Activate();
+
+            m_RotXnSlider.Activate();
+            m_RotYnSlider.Activate();
+            m_RotZnSlider.Activate();
+
+            if ( gcase->m_SecondaryType() == vsp::GEOM_TARGET )
+            {
+                Geom* geom = veh->FindGeom( gcase->m_SecondaryGeomID );
+
+                if ( geom )
+                {
+                    HingeGeom* hinge_ptr = dynamic_cast< HingeGeom* >( geom );
+
+                    if ( hinge_ptr )
+                    {
+                        if ( hinge_ptr->m_JointTranslateFlag() )
+                        {
+                            m_DispXSlider.Deactivate();
+                            m_DispYSlider.Deactivate();
+                            m_DispZSlider.Deactivate();
+                        }
+                    }
+                }
+            }
+
+            if ( gcase->m_SymmRotX() )
+            {
+                m_RotXnSlider.Deactivate();
+            }
+            if ( gcase->m_SymmRotY() )
+            {
+                m_RotYnSlider.Deactivate();
+            }
+            if ( gcase->m_SymmRotZ() )
+            {
+                m_RotZnSlider.Deactivate();
+            }
+        }
+
+        m_AzElLayout.GetGroup()->activate();
+        m_PolyVisibleToggleGroup.Activate();
+        if ( !gcase->m_DiscreteVisibilityFlag() )
+        {
+            m_AzElLayout.GetGroup()->deactivate();
+        }
+        else
+        {
+            m_PolyVisibleToggleGroup.Deactivate();
+        }
+
+        if ( gcase->m_GeometryAnalysisType() == vsp::PLANE_2PT_ANGLE_INTERFERENCE )
+        {
+            OptionsDisplayGroup( &m_RotateOptionsLayout );
+        }
+        else if ( gcase->m_GeometryAnalysisType() == vsp::VISIBLE_FROM_POINT_ANALYSIS )
+        {
+            OptionsDisplayGroup( &m_VisibilityOptionsLayout );
+        }
+        else if ( gcase->m_GeometryAnalysisType() == vsp::LINEAR_SWEPT_VOLUME_ANALYSIS )
+        {
+            OptionsDisplayGroup( &m_MotionOptionsLayout );
+        }
+        else if ( gcase->m_GeometryAnalysisType() == vsp::VISIBLE_AT_SURF_ANALYSIS )
+        {
+            OptionsDisplayGroup( & m_LookAtVisibilityOptionsLayout );
+        }
+        else
+        {
+            OptionsDisplayGroup( nullptr );
+        }
+    }
+    else
+    {
+        m_GCaseLayout.GetGroup()->deactivate();
+
+        m_GANameInput.Update( "" );
+
+        m_ResultOutput.Update( "" );
+    }
+
+
+    m_FLTK_Window->redraw();
+    return true;
+}
+
+void GeometryAnalysisScreen::UpdateGeometryAnalysisBrowser()
+{
+    char str[512];
+
+    int scroll_pos = m_GeometryAnalysisBrowser->vposition();
+    int h_pos = m_GeometryAnalysisBrowser->hposition();
+    m_GeometryAnalysisBrowser->clear();
+    m_GeometryAnalysisBrowser->column_char( ':' );
+
+    snprintf( str, sizeof( str ),  "@b@.NAME:@b@.PRIMARY:@b@.SECONDARY:@b@.RESULT" );
+    m_GeometryAnalysisBrowser->add( str );
+    m_GeometryAnalysisBrowser->addCopyText( "header" );
+
+    vector < GeometryAnalysisCase* > gcases = GeometryAnalysisMgr.GetAllGeometryAnalyses();
+    for ( int i = 0 ; i < (int)gcases.size() ; i++ )
+    {
+        string secondary;
+        if ( gcases[i]->m_GeometryAnalysisType() != vsp::EXTERNAL_SELF_INTERFERENCE &&
+             gcases[i]->m_GeometryAnalysisType() != vsp::GEAR_CG_TIPBACK_ANALYSIS &&
+             gcases[i]->m_GeometryAnalysisType() != vsp::GEAR_WEIGHT_DISTRIBUTION_ANALYSIS &&
+             gcases[i]->m_GeometryAnalysisType() != vsp::GEAR_TIPOVER_ANALYSIS )
+        {
+            secondary = gcases[i]->GetSecondaryName();
+        }
+
+        snprintf( str, sizeof( str ),  "%s:%s:%s:%f: \n", gcases[i]->GetName().c_str(), gcases[i]->GetPrimaryName().c_str(), secondary.c_str(), gcases[i]->m_LastResultValue() );
+        m_GeometryAnalysisBrowser->add( str );
+    }
+    if ( m_GeometryBrowserSelect >= 0 && m_GeometryBrowserSelect < (int)gcases.size() )
+    {
+        m_GeometryAnalysisBrowser->select( m_GeometryBrowserSelect + 2 );
+    }
+
+    m_GeometryAnalysisBrowser->vposition( scroll_pos );
+    m_GeometryAnalysisBrowser->hposition( h_pos );
+}
+
+void GeometryAnalysisScreen::UpdateWindowSubSurfBrowser()
+{
+    Vehicle *veh = VehicleMgr.GetVehicle();
+    if ( !veh )
+    {
+        return;
+    }
+
+    m_SubSurfCutoutBrowser->clear();
+
+    GeometryAnalysisCase* gcase = GeometryAnalysisMgr.GetGeometryAnalysis( m_GeometryBrowserSelect );
+    if ( gcase )
+    {
+        char str[512];
+        vector< SubSurface* > subsurf_vec = SubSurfaceMgr.GetSubSurfs();
+        // Load Subsurface Names
+        for ( int i = 0; i < ( int )subsurf_vec.size() ; i++ )
+        {
+            string geomid = subsurf_vec[i]->GetCompID();
+            Geom* gptr = veh->FindGeom( geomid );
+            if ( gptr )
+            {
+                snprintf( str, sizeof( str ), "%s:  %s", gptr->GetName().c_str(), subsurf_vec[i]->GetName().c_str() );
+
+                if ( vector_contains_val( gcase->m_CutoutVec, subsurf_vec[i]->GetID() ) )
+                {
+                    m_SubSurfCutoutBrowser->add( str, 1 );
+                }
+                else
+                {
+                    m_SubSurfCutoutBrowser->add( str, 0  );
+                }
+            }
+        }
+    }
+}
+
+void GeometryAnalysisScreen::UpdateAzElScrollGroup()
+{
+    int button_width = 60;
+
+    GeometryAnalysisCase* gcase = GeometryAnalysisMgr.GetGeometryAnalysis( m_GeometryBrowserSelect );
+    if ( gcase )
+    {
+        if ( m_AzSliderVec.size() != gcase->m_VizAzimuthVec.size() )
+        {
+            m_AzElScroll->clear();
+            m_AzElScrollLayout.SetGroup( m_AzElScroll );
+            m_AzElScrollLayout.InitWidthHeightVals();
+
+            m_AzSliderVec.clear();
+            m_AzSliderVec.resize( gcase->m_VizAzimuthVec.size() );
+            m_ElSliderVec.clear();
+            m_ElSliderVec.resize( gcase->m_VizAzimuthVec.size() );
+
+
+            m_AzElScrollLayout.SetFitWidthFlag( true );
+            m_AzElScrollLayout.SetSameLineFlag( true );
+            m_AzElScrollLayout.SetButtonWidth( button_width );
+
+            for ( int i = 0 ; i < (int)gcase->m_VizAzimuthVec.size() ; i++ )
+            {
+                m_AzElScrollLayout.AddSlider( m_AzSliderVec[i], gcase->m_VizAzimuthVec[i]->GetName().c_str(), 10.0, "%3.2f", m_AzElScrollLayout.GetW() / 2 );
+                m_AzElScrollLayout.AddSlider( m_ElSliderVec[i], gcase->m_VizElevationVec[i]->GetName().c_str(), 10.0, "%3.2f" );
+                m_AzElScrollLayout.ForceNewLine();
+
+                m_AzSliderVec[i].Update( gcase->m_VizAzimuthVec[i]->GetID() );
+                m_ElSliderVec[i].Update( gcase->m_VizElevationVec[i]->GetID() );
+            }
+        }
+        else
+        {
+            for ( int i = 0 ; i < (int)gcase->m_VizAzimuthVec.size() ; i++ )
+            {
+                m_AzSliderVec[i].SetButtonName( gcase->m_VizAzimuthVec[i]->GetName() );
+                m_ElSliderVec[i].SetButtonName( gcase->m_VizElevationVec[i]->GetName() );
+
+                m_AzSliderVec[i].Update( gcase->m_VizAzimuthVec[i]->GetID() );
+                m_ElSliderVec[i].Update( gcase->m_VizElevationVec[i]->GetID() );
+            }
+        }
+
+        if ( m_CurrentAzElScrollIndex >= (int)gcase->m_VizAzimuthVec.size() )
+        {
+            m_CurrentAzElScrollIndex = -1;
+        }
+
+        m_LookAlongAzElButton.Activate();
+        m_DelAzElButton.Activate();
+        if ( m_CurrentAzElScrollIndex == -1 )
+        {
+            m_LookAlongAzElButton.Deactivate();
+            m_DelAzElButton.Deactivate();
+        }
+
+        for ( int i = 0 ; i < (int)gcase->m_VizAzimuthVec.size() ; i++ )
+        {
+            if( i == m_CurrentAzElScrollIndex )
+            {
+                m_AzSliderVec[i].SetLabelColor( FL_YELLOW );
+                m_ElSliderVec[i].SetLabelColor( FL_YELLOW );
+            }
+            else
+            {
+                m_AzSliderVec[i].ResetLabelColor();
+                m_ElSliderVec[i].ResetLabelColor();
+            }
+        }
+    }
+    else
+    {
+        m_AzElScroll->clear();
+        m_AzElScrollLayout.SetGroup( m_AzElScroll );
+        m_AzElScrollLayout.InitWidthHeightVals();
+
+        m_AzSliderVec.clear();
+        m_ElSliderVec.clear();
+
+        m_CurrentAzElScrollIndex = -1;
+    }
+}
+
+
+void GeometryAnalysisScreen::OptionsDisplayGroup( GroupLayout* group )
+{
+    if ( m_OptionsCurrDisplayGroup == group )
+    {
+        return;
+    }
+
+    m_RotateOptionsLayout.Hide();
+    m_VisibilityOptionsLayout.Hide();
+    m_MotionOptionsLayout.Hide();
+    m_LookAtVisibilityOptionsLayout.Hide();
+
+    m_OptionsCurrDisplayGroup = group;
+
+    if ( group )
+    {
+        group->Show();
+    }
+}
+
+void GeometryAnalysisScreen::LoadDrawObjs( vector< DrawObj* > & draw_obj_vec )
+{
+    GeometryAnalysisCase* gcase = GeometryAnalysisMgr.GetGeometryAnalysis( m_GeometryBrowserSelect );
+
+    if ( gcase )
+    {
+        gcase->LoadDrawObjs( draw_obj_vec );
+    }
+}
+
+void GeometryAnalysisScreen::MarkDOChanged()
+{
+    vector< DrawObj* > draw_obj_vec;
+    LoadDrawObjs( draw_obj_vec );
+
+    for ( int i = 0; i < draw_obj_vec.size(); i++ )
+    {
+        draw_obj_vec[i]->m_GeomChanged = true;
+    }
+}
+
+bool GeometryAnalysisScreen::GetVisBndBox( BndBox &bbox )
+{
+    bool anyvisible = false;
+
+    vector< DrawObj* > draw_obj_vec;
+    LoadDrawObjs( draw_obj_vec );
+
+    for(int j = 0; j < (int)draw_obj_vec.size(); j++)
+    {
+        if(draw_obj_vec[j]->m_Visible)
+        {
+            bbox.Update( draw_obj_vec[j]->m_PntVec );
+            bbox.Update( draw_obj_vec[j]->m_PntMesh );
+            anyvisible = true;
+        }
+    }
+
+    return anyvisible;
+}
+
+//==== Show Screen ====//
+void GeometryAnalysisScreen::Show()
+{
+    MarkDOChanged();
+    m_ScreenMgr->SetUpdateFlag( true );
+    BasicScreen::Show();
+}
+
+
+//==== Hide Screen ====//
+void GeometryAnalysisScreen::Hide()
+{
+    m_FLTK_Window->hide();
+    m_ScreenMgr->SetUpdateFlag( true );
+}
+
+//==== Callbacks ====//
+void GeometryAnalysisScreen::CallBack( Fl_Widget *w )
+{
+    Vehicle *veh = VehicleMgr.GetVehicle();
+
+    m_GeometryAnalysisBrowser->HidePopupInput();
+
+    if ( w == m_GeometryAnalysisBrowser )
+    {
+        // Apply popup rename to previously selected analysis case
+        if ( m_GeometryAnalysisBrowser->GetCBReason() == BROWSER_CALLBACK_POPUP_ENTER )
+        {
+            GeometryAnalysisCase* gcase = GeometryAnalysisMgr.GetGeometryAnalysis( m_GeometryBrowserSelect );
+            if ( gcase )
+            {
+                string aname = m_GeometryAnalysisBrowser->GetPopupValue();
+                gcase->SetName( aname );
+            }
+        }
+
+        // Select new geom analysis case
+        int sel = m_GeometryAnalysisBrowser->value();
+        m_GeometryBrowserSelect = sel - 2;
+
+        GeometryAnalysisCase* gcase = GeometryAnalysisMgr.GetGeometryAnalysis( m_GeometryBrowserSelect );
+
+        if ( gcase )
+        {
+            m_PrimaryGeomPicker.SetGeomChoice( gcase->m_PrimaryGeomID );
+            m_SecondaryGeomPicker.SetGeomChoice( gcase->m_SecondaryGeomID );
+
+            ResultsViewer * rv = dynamic_cast < ResultsViewer* > ( m_ScreenMgr->GetScreen( vsp::VSP_RESULTS_VIEWER_SCREEN ) );
+            if ( rv )
+            {
+                rv->SetSelectedResult( gcase->m_LastResult );
+            }
+        }
+
+        MarkDOChanged();
+
+        // open popup input if double clicked
+        if ( m_GeometryAnalysisBrowser->GetCBReason() == BROWSER_CALLBACK_POPUP_OPEN )
+        {
+            GeometryAnalysisCase* gcase = GeometryAnalysisMgr.GetGeometryAnalysis( m_GeometryBrowserSelect );
+            if ( gcase )
+            {
+                m_GeometryAnalysisBrowser->InsertPopupInput( gcase->GetName(), m_GeometryBrowserSelect + 2 );
+            }
+        }
+    }
+    else if ( w == m_SubSurfCutoutBrowser )
+    {
+        GeometryAnalysisCase* gcase = GeometryAnalysisMgr.GetGeometryAnalysis( m_GeometryBrowserSelect );
+
+        if ( gcase )
+        {
+            int curr_index = m_SubSurfCutoutBrowser->value();
+            vector< SubSurface* > subsurf_vec = SubSurfaceMgr.GetSubSurfs();
+
+            if ( (int)subsurf_vec.size() > 0 && curr_index >= 1 && curr_index <= (int)subsurf_vec.size() )
+            {
+
+                bool flag = !!m_SubSurfCutoutBrowser->checked( curr_index );
+
+                string curr_ID = subsurf_vec[curr_index - 1]->GetID();
+
+                if ( flag )
+                {
+                    gcase->m_CutoutVec.push_back( curr_ID );
+                }
+                else
+                {
+                    vector_remove_val( gcase->m_CutoutVec, curr_ID );
+                }
+            }
+        }
+    }
+    else
+    {
+        return;
+    }
+
+    m_ScreenMgr->SetUpdateFlag( true );
+}
+
+//==== Gui Device CallBacks ====//
+void GeometryAnalysisScreen::GuiDeviceCallBack( GuiDevice* gui_device )
+{
+    assert( m_ScreenMgr );
+
+    m_GeometryAnalysisBrowser->HidePopupInput();
+
+    Vehicle *veh = VehicleMgr.GetVehicle();
+
+    GeometryAnalysisCase* gcase = GeometryAnalysisMgr.GetGeometryAnalysis( m_GeometryBrowserSelect );
+
+    if ( gui_device == &m_AddGeometryAnalysis )
+    {
+        string id = GeometryAnalysisMgr.AddGeometryAnalysis();
+        m_GeometryBrowserSelect = GeometryAnalysisMgr.GetGeometryAnalysisIndex( id );
+    }
+    else if ( gui_device == &m_DelGeometryAnalysis )
+    {
+        GeometryAnalysisMgr.DeleteGeometryAnalysis( m_GeometryBrowserSelect );
+        if ( m_GeometryBrowserSelect > GeometryAnalysisMgr.GetAllGeometryAnalyses().size() -1 )
+        {
+            m_GeometryBrowserSelect = GeometryAnalysisMgr.GetAllGeometryAnalyses().size() -1;
+        }
+    }
+    else if ( gui_device == &m_DelAllGeometryAnalyses )
+    {
+        GeometryAnalysisMgr.DeleteAllGeometryAnalyses();
+    }
+    else if ( gui_device == & m_GANameInput )
+    {
+        if ( gcase )
+        {
+            gcase->SetName( m_GANameInput.GetString() );
+        }
+    }
+    else if ( gui_device == &m_PrimaryModeChoice || gui_device == &m_PrimaryToggleGroup )
+    {
+        if ( gcase )
+        {
+            if ( gcase->m_PrimaryType() == vsp::MODE_TARGET )
+            {
+                int indx = m_PrimaryModeChoice.GetVal();
+                if ( indx >= 0  && indx < m_ModeIDs.size() )
+                {
+                    gcase->m_PrimaryModeID = m_ModeIDs[ indx ];
+                }
+                else
+                {
+                    gcase->m_PrimaryModeID = "";
+                }
+            }
+
+            // Include this code if we want to actively visualize the mode in real time.
+            /*
+            Mode *m = ModeMgr.GetMode( gcase->m_BaseModeID );
+            if ( m )
+            {
+                m->ApplySettings();
+            }
+            */
+        }
+    }
+    else if ( gui_device == & m_PrimaryGeomPicker )
+    {
+        if ( gcase )
+        {
+            gcase->m_PrimaryGeomID = m_PrimaryGeomPicker.GetGeomChoice();
+        }
+    }
+    else if ( gui_device == & m_SecondaryGeomPicker )
+    {
+        if ( gcase )
+        {
+            gcase->m_SecondaryGeomID = m_SecondaryGeomPicker.GetGeomChoice();
+        }
+    }
+    else if ( gui_device == & m_ShowBoth )
+    {
+        if ( gcase )
+        {
+            gcase->ShowBoth();
+        }
+    }
+    else if ( gui_device == & m_ShowOnlyBoth )
+    {
+        if ( gcase )
+        {
+            gcase->ShowOnlyBoth();
+        }
+    }
+    else if ( gui_device == &m_EvaluateAllGeometryAnalyses )
+    {
+        GeometryAnalysisMgr.EvaluateAll();
+
+        ResultsViewer * rv = dynamic_cast < ResultsViewer* > ( m_ScreenMgr->GetScreen( vsp::VSP_RESULTS_VIEWER_SCREEN ) );
+        if ( rv )
+        {
+            rv->SetSelectedResult( ResultsMgr.FindLatestResultsID( "GeometryAnalysisAll" ) );
+        }
+    }
+    else if ( gui_device == &m_Evaluate )
+    {
+        if ( gcase )
+        {
+            gcase->Evaluate();
+
+            ResultsViewer * rv = dynamic_cast < ResultsViewer* > ( m_ScreenMgr->GetScreen( vsp::VSP_RESULTS_VIEWER_SCREEN ) );
+            if ( rv )
+            {
+                rv->SetSelectedResult( gcase->m_LastResult );
+            }
+        }
+    }
+    else if ( gui_device == &m_ShowResultsViewer )
+    {
+        m_ScreenMgr->ShowScreen( vsp::VSP_RESULTS_VIEWER_SCREEN );
+
+        if ( gcase )
+        {
+            ResultsViewer * rv = dynamic_cast < ResultsViewer* > ( m_ScreenMgr->GetScreen( vsp::VSP_RESULTS_VIEWER_SCREEN ) );
+            if ( rv )
+            {
+                rv->SetSelectedResult( gcase->m_LastResult );
+            }
+        }
+    }
+    else if ( gui_device == &m_ApplyRotation )
+    {
+        Geom* parent_geom = veh->FindGeom( gcase->m_SecondaryGeomID );
+        AuxiliaryGeom * aux = dynamic_cast< AuxiliaryGeom* > ( parent_geom );
+        if ( aux )
+        {
+            if ( gcase->m_GeometryAnalysisType() == vsp::PLANE_2PT_ANGLE_INTERFERENCE )
+            {
+                vector < double > tipbogie = ResultsMgr.GetDoubleResults( gcase->m_LastResult, "TipBogie", 0 );
+                if ( tipbogie.size() > 0 )
+                {
+                    aux->m_BogieTheta.SetFromDevice( tipbogie[ 0 ] );
+                }
+
+                vector < double > tipwheel = ResultsMgr.GetDoubleResults( gcase->m_LastResult, "TipWheel", 0 );
+                if ( tipwheel.size() > 0 )
+                {
+                    aux->m_WheelTheta.SetFromDevice( tipwheel[ 0 ] );
+                }
+            }
+            else if ( gcase->m_GeometryAnalysisType() == vsp::PLANE_1PT_ANGLE_INTERFERENCE )
+            {
+                vector < double > roll = ResultsMgr.GetDoubleResults( gcase->m_LastResult, "RollAngle", 0 );
+                if ( roll.size() > 0 )
+                {
+                    aux->m_RollTheta.SetFromDevice( roll[ 0 ] );
+                }
+            }
+        }
+    }
+    else if ( gui_device == &m_LookAlongButton )
+    {
+        if ( gcase )
+        {
+            MainVSPScreen* main_screen = dynamic_cast< MainVSPScreen* >( m_ScreenMgr->GetScreen( vsp::VSP_MAIN_SCREEN ) );
+            if ( main_screen )
+            {
+                const vec3d dir = ToCartesian( vec3d( 1, -gcase->m_Azimuth() * M_PI / 180.0, -gcase->m_Elevation() * M_PI / 180.0 ) );
+                main_screen->AlignView( dir );
+            }
+        }
+    }
+    else if ( gui_device == &m_AddAzElButton )
+    {
+        if ( gcase )
+        {
+            gcase->AddAzEl( 0, 0 );
+            gcase->RenameParms();
+            m_CurrentAzElScrollIndex = gcase->m_VizAzimuthVec.size() - 1;
+        }
+    }
+    else if ( gui_device == &m_LookAlongAzElButton )
+    {
+        if ( gcase )
+        {
+            if ( m_CurrentAzElScrollIndex >= 0 && m_CurrentAzElScrollIndex < (int)gcase->m_VizAzimuthVec.size() )
+            {
+                double az = gcase->m_VizAzimuthVec[ m_CurrentAzElScrollIndex ]->Get();
+                double el = gcase->m_VizElevationVec[ m_CurrentAzElScrollIndex ]->Get();
+
+                MainVSPScreen* main_screen = dynamic_cast< MainVSPScreen* >( m_ScreenMgr->GetScreen( vsp::VSP_MAIN_SCREEN ) );
+                if ( main_screen )
+                {
+                    const vec3d dir = ToCartesian( vec3d( 1, -az * M_PI / 180.0, -el * M_PI / 180.0 ) );
+                    main_screen->AlignView( dir );
+                }
+            }
+        }
+    }
+    else if ( gui_device == &m_DelAzElButton )
+    {
+        if ( gcase )
+        {
+            gcase->RemoveAzEl( m_CurrentAzElScrollIndex );
+            gcase->RenameParms();
+        }
+    }
+    else if ( gui_device == &m_DelAllAzElButton )
+    {
+        if ( gcase )
+        {
+            gcase->RemoveAllAzEl();
+            m_CurrentAzElScrollIndex = -1;
+        }
+    }
+    else
+    {
+        if ( gcase )
+        {
+            // Identify event in m_AzElLayout. Set current index to row that
+            // corresponds to the event.
+            string parm_id = gui_device->GetParmID();
+
+            for( size_t j = 0; j < gcase->m_VizAzimuthVec.size(); j++ )
+            {
+                if( !strcmp( parm_id.c_str(), gcase->m_VizAzimuthVec[j]->GetID().c_str() ) ||
+                    !strcmp( parm_id.c_str(), gcase->m_VizElevationVec[j]->GetID().c_str() ) )
+                {
+                    m_CurrentAzElScrollIndex = j;
+                    break;
+                }
+            }
+        }
+    }
+
+    m_ScreenMgr->SetUpdateFlag( true );
+}

@@ -1,0 +1,16 @@
+# ninja log v6
+14	139	7934341505049353	QtAVL_autogen/timestamp	56eb6af7cab5c562
+14	139	7934341505049353	QtAVL_autogen/mocs_compilation.cpp	56eb6af7cab5c562
+14	139	7934341505049353	D:/GitHub/QtAVL/build/QtAVL_autogen/timestamp	56eb6af7cab5c562
+14	139	7934341505049353	D:/GitHub/QtAVL/build/QtAVL_autogen/mocs_compilation.cpp	56eb6af7cab5c562
+560	2570	7934338350254614	CMakeFiles/QtAVL.dir/QtAVL_autogen/mocs_compilation.cpp.obj	684fb54540f8132e
+458	2154	7933902322731508	CMakeFiles/QtAVL.dir/main.cpp.obj	e68326eff805bdef
+463	2250	7933902322781568	CMakeFiles/QtAVL.dir/mainwindow.cpp.obj	4a4712aad1320dfa
+2805	3010	7934338372716640	QtAVL.exe	988def23fbf5ab0f
+21	1911	7968738986677127	build.ninja	54cf0c14d9512e18
+21	1911	7968738986563467	D:/GitHub/QtAVL/build/cmake_install.cmake	54cf0c14d9512e18
+562	2618	7934338350284641	CMakeFiles/QtAVL.dir/src/mainwindow.cpp.obj	11cf8f0673c9160f
+30	428	7934187906913465	.qt/qml_imports/QtAVL_build.cmake	117f58f35f5599b8
+30	428	7934187906913465	D:/GitHub/QtAVL/build/.qt/qml_imports/QtAVL_build.cmake	117f58f35f5599b8
+1116	3263	7934187913848699	CMakeFiles/QtAVL.dir/src/main.cpp.obj	f9c0a26243479f7e
+565	2805	7934338350314666	CMakeFiles/QtAVL.dir/src/viewport/viewport3d.cpp.obj	98f00cf6d03f7cac

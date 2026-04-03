@@ -1,0 +1,10 @@
+D:/GitHub/QtAVL/build/CMakeFiles/QtAVL.dir
+D:/GitHub/QtAVL/build/CMakeFiles/QtAVL_qmlimportscan.dir
+D:/GitHub/QtAVL/build/CMakeFiles/edit_cache.dir
+D:/GitHub/QtAVL/build/CMakeFiles/rebuild_cache.dir
+D:/GitHub/QtAVL/build/CMakeFiles/list_install_components.dir
+D:/GitHub/QtAVL/build/CMakeFiles/install.dir
+D:/GitHub/QtAVL/build/CMakeFiles/install/local.dir
+D:/GitHub/QtAVL/build/CMakeFiles/install/strip.dir
+D:/GitHub/QtAVL/build/CMakeFiles/QtAVL_autogen_timestamp_deps.dir
+D:/GitHub/QtAVL/build/CMakeFiles/QtAVL_autogen.dir
