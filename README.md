@@ -11,7 +11,7 @@ Copyright and intellectual property remain with their original authors and right
 | `AVL3.52src/` | AVL (Athena Vortex Lattice) | Mark Drela, Harold Youngren, and contributors | GPL terms are declared in source headers (for example `AVL3.52src/src/*.f`); some plot library files include LGPL/GPL notices in file headers |
 | `Xfoil699src/` | XFOIL | Mark Drela, Harold Youngren, and contributors | GPL terms are declared in source headers (for example `Xfoil699src/src/*.f`); some plot library files include LGPL/GPL notices in file headers |
 | `AeroDes/` | AeroDes | The Regents of the University of California + contributors | BSD 3-Clause style license (`AeroDes/LICENSE.txt`) |
-| `AMATUIUCDataBase/` | UIUC Airfoil Coordinates Database (snapshot) | UIUC airfoil database maintainers and original airfoil authors | No standalone license file is included in this local snapshot; preserve attribution and verify redistribution terms for your use case |
+| `AMATUIUCDataBase/` | UIUC Airfoil Coordinates Database | UIUC airfoil database maintainers and original airfoil authors | Coordinate `.dat` files are not distributed in this repository; download them yourself from the UIUC source before use. |
 
 ## Attribution Notes
 
